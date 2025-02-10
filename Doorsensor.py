@@ -57,7 +57,7 @@ try:
                 line_notify(message)  
                 last_open_time = datetime.now()
 
-        if datetime.now() - last_open_time > timedelta(minutes=5):
+        if datetime.now() - last_open_time > timedelta(hours=24):
             message = "[通知] ドアが24時間開かれていません。大丈夫かな・・・"
             line_notify(message)
             last_open_time = datetime.now()
