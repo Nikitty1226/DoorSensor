@@ -16,7 +16,7 @@ load_dotenv()
 USER_ID = os.getenv("USER_ID")
 CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN")
 
-if not (USER_ID and CHANNEL_ACCESS_TOKEN):
+if not all([USER_ID, CHANNEL_ACCESS_TOKEN]):
     print("環境変数が設定されていません")
     exit(1)
 
@@ -30,8 +30,8 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-# LINEにメッセージを送る関数
 def line_notify(message):
+    """LINEにメッセージを送る関数"""
     try:
         messages = TextSendMessage(text=message)
         line_bot_api.push_message(USER_ID, messages)
@@ -49,47 +49,52 @@ except Exception as e:
     line_notify(f"[エラー通知] {message}")
     exit(1)
 
-# GPIOと時刻の初期状態の入力
-past_value = GPIO.input(18)
-last_open_time = datetime.now()
-
 # 開始通知
 logging.info("プログラム開始")
 message = "[起動通知] プログラムを開始します"
 line_notify(message)
 
-# メインループ
-try:
-    while True:
-        value = GPIO.input(18)
-        if value != past_value:
-            if value == 1:
-                message = "[通知] ドアが開きました！"
-                line_notify(message)  
+def main():
+    """メイン処理"""
+    
+    # GPIOと時刻の初期状態の入力
+    past_value = GPIO.input(18)
+    last_open_time = datetime.now()
+
+    try:
+        while True:
+            value = GPIO.input(18)
+            if value != past_value:
+                if value == 1:
+                    message = "[通知] ドアが開きました！"
+                    line_notify(message)  
+                    last_open_time = datetime.now()
+
+            if datetime.now() - last_open_time > timedelta(hours=24):
+                message = "[通知] ドアが24時間開かれていません。大丈夫かな・・・"
+                line_notify(message)
                 last_open_time = datetime.now()
 
-        if datetime.now() - last_open_time > timedelta(hours=24):
-            message = "[通知] ドアが24時間開かれていません。大丈夫かな・・・"
-            line_notify(message)
-            last_open_time = datetime.now()
+            past_value = value
+            time.sleep(1)
 
-        past_value = value
-        time.sleep(1)
+    # キーボード割り込みやエラーが発生した場合の処理
+    except KeyboardInterrupt:
+        logging.info("通知：手動停止（Control+C）を検知")
+        message = "[通知] プログラムが手動で停止されました"
+        line_notify(message)
 
-# キーボード割り込みやエラーが発生した場合の処理
-except KeyboardInterrupt:
-    logging.info("通知：手動停止（Control+C）を検知")
-    message = "[通知] プログラムが手動で停止されました"
-    line_notify(message)
+    except Exception as e:
+        logging.error(f"エラー：{e}")
+        message = f"[エラー通知] {e}"
+        line_notify(message)
+        
+    # 処理終了時にGPIOピンの設定をクリーンアップ
+    finally:
+        message = "[終了通知] プログラムが停止しました"
+        line_notify(message)
+        logging.info("プログラム終了")
+        GPIO.cleanup()
 
-except Exception as e:
-    logging.error(f"エラー：{e}")
-    message = f"[エラー通知] {e}"
-    line_notify(message)
-    
-# 処理終了時にGPIOピンの設定をクリーンアップ
-finally:
-    message = "[終了通知] プログラムが停止しました"
-    line_notify(message)
-    logging.info("プログラム終了")
-    GPIO.cleanup()
+if __name__ == "__main__":
+    main()
