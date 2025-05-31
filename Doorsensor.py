@@ -12,11 +12,13 @@ from linebot.models import TextSendMessage
 # 環境変数読み込み
 load_dotenv()
 
-# ユーザーIDとLINEチャネルアクセストークンを設定
+# 環境変数を設定
 USER_ID = os.getenv("USER_ID")
 CHANNEL_ACCESS_TOKEN = os.getenv("CHANNEL_ACCESS_TOKEN")
+GPIO_PIN = int(os.getenv("GPIO_PIN"))
+HOURS = int(os.getenv("HOURS"))
 
-if not all([USER_ID, CHANNEL_ACCESS_TOKEN]):
+if not all([USER_ID, CHANNEL_ACCESS_TOKEN, GPIO_PIN, HOURS]):
     print("環境変数が設定されていません")
     exit(1)
 
@@ -42,7 +44,7 @@ def line_notify(message):
 # GPIOの設定
 try:
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup(18, GPIO.IN, pull_up_down = GPIO.PUD_UP)
+    GPIO.setup(GPIO_PIN, GPIO.IN, pull_up_down = GPIO.PUD_UP)
 except Exception as e:
     message = f"GPIO設定エラー: {e}"
     logging.error(message)
@@ -58,20 +60,20 @@ def main():
     """メイン処理"""
     
     # GPIOと時刻の初期状態の入力
-    past_value = GPIO.input(18)
+    past_value = GPIO.input(GPIO_PIN)
     last_open_time = datetime.now()
 
     try:
         while True:
-            value = GPIO.input(18)
+            value = GPIO.input(GPIO_PIN)
             if value != past_value:
                 if value == 1:
                     message = "[通知] ドアが開きました！"
                     line_notify(message)  
                     last_open_time = datetime.now()
 
-            if datetime.now() - last_open_time > timedelta(hours=24):
-                message = "[通知] ドアが24時間開かれていません。大丈夫かな・・・"
+            if datetime.now() - last_open_time > timedelta(hours=HOURS):
+                message = f"[通知] ドアが{HOURS}時間開かれていません。大丈夫かな・・・"
                 line_notify(message)
                 last_open_time = datetime.now()
 
